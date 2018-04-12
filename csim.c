@@ -108,76 +108,44 @@ void freeCache()
  */
 void accessData(mem_addr_t addr)
 {
-    int i, evict_index, temp = sizeof(long long int);
-    //unsigned long long int eviction_lru = ULONG_MAX;
-    //unsigned int eviction_line = 0;
+    int i, evict_index = 0;
     mem_addr_t set_index = (addr >> b) & set_index_mask;
     mem_addr_t tag = addr >> (s+b);
 
     cache_set_t cache_set = cache[set_index];
     for(i = 0; i < E; i++) {
-        if(cache_set[i].tag == tag) {
+        if(cache_set[i].tag == tag && cache_set[i].valid == 1) {
             if(cache_set[i].valid == 1) {
-                printf("hit (tag:%lld, set_index:%lld)",tag, set_index);
-                printf("lru:%lld",cache_set[i].lru);
                 cache_set[i].lru = lru_counter;
                 hit_count++;
                 break;
             }
-            else {
-                miss_count++;
-                cache_set[i].valid = 1;
-                cache_set[i].tag = tag;
-                cache_set[i].lru = lru_counter;
-                printf("miss (tag:%lld, set_index:%lld)",tag, set_index);
-                break;
-            }
         }
-        else {
-            if(cache_set[i].valid == 0) {
-                miss_count++;
-                cache_set[i].valid = 1;
-                cache_set[i].tag = tag;
-                cache_set[i].lru = lru_counter;
-                printf("miss (tag:%lld, set_index:%lld)",tag, set_index);
-                break;
-            }
-        }
+        if(cache_set[evict_index].lru > cache_set[i].lru) evict_index = i;
     }
     if(i == E) {
         miss_count++;
-        printf("miss (tag:%lld, set_index:%lld)",tag, set_index);
-        for(i = 0; i < E; i++) {
-            if(temp > cache_set[i].lru) {
-                temp = cache_set[i].lru;
-                evict_index = i;
-            }
+        if(cache_set[evict_index].valid == 0) {
+            cache_set[evict_index].valid = 1;
+            cache_set[evict_index].tag = tag;
+            cache_set[evict_index].lru = lru_counter;
         }
-        printf("eviction (replacedTag:%lld, evict_index:%d)",cache_set[evict_index].tag, evict_index);
-        cache_set[evict_index].valid = 1;
-        cache_set[evict_index].tag = tag;
-        cache_set[evict_index].lru = lru_counter;
-        eviction_count++;       
-    }
-    //printf("lru: %lld",lru_counter);
-    lru_counter++;
-    printf("\n");
-    for(i = 0; i < E; i++){
-        printf(" tag:%lld",cache_set[i].tag);
-        printf(" lru:%lld",cache_set[i].lru);
-        printf("\n");
+        else {
+            cache_set[evict_index].valid = 1;
+            cache_set[evict_index].tag = tag;
+            cache_set[evict_index].lru = lru_counter;
+            eviction_count++;
+        }
     }
 }
-
-
 /*
  * replayTrace - replays the given trace file against the cache 
  */
 void replayTrace(char* trace_fn)
 {
     int i = 0, j = 0, count = 0;
-    char buf[1000], addr_temp[10];
-    char bufToPrint[1000];
+    char buf[1000], addr_temp[14];
+    //char bufToPrint[1000];
     mem_addr_t addr=0;
     unsigned int len=24;
     FILE* trace_fp = fopen(trace_fn, "r");
@@ -193,10 +161,11 @@ void replayTrace(char* trace_fn)
 
     trace_fp = fopen(trace_fn, "r");
     while(j < count - 1) {
+        lru_counter++;
         fgets(buf,len,trace_fp);
-        strcpy(bufToPrint, buf);
-        bufToPrint[strlen(bufToPrint) - 1] = ' ';
-        if(bufToPrint[0] != 'I') printf("%s ",bufToPrint);
+        //strcpy(bufToPrint, buf);
+        //bufToPrint[strlen(bufToPrint) - 1] = ' ';
+        //if(bufToPrint[0] != 'I') printf("%s ",bufToPrint);
         for(i = 2; i < 24; i++) {
             if(buf[i + 1] != ',') {
                 addr_temp[i] = buf[i + 1];
@@ -205,17 +174,17 @@ void replayTrace(char* trace_fn)
         }
         addr_temp[i] = '\0';
         sscanf(addr_temp, "%llx", &addr);
-        //printf("%ld\n",addr);
+        printf("%s\n",addr_temp);
+        //printf("%lld",addr);
         if(buf[1] == 'L' || buf[1] == 'S') {
             accessData(addr);
-            printf("\n");
+            //printf("\n");
         }
         else if(buf[1] == 'M') {
             accessData(addr);
             accessData(addr);
-            printf("\n");
+            //printf("\n");
         }
-        
         j++;
     }
 
